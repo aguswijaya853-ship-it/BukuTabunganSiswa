@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import firebaseConfig from '../../firebase-applet-config.json';
+import { resolvedFirebaseConfig } from '../firebase';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -37,7 +37,7 @@ export class ErrorBoundary extends React.Component<
     const isFreeReadQuota = msg.includes(
       "Quota exceeded for quota metric 'Free daily read units per project (free tier database)'"
     );
-    const upgradeUrl = `https://console.firebase.google.com/project/${firebaseConfig.projectId}/firestore/databases/${firebaseConfig.firestoreDatabaseId}/data?openUpgradeDialog=true`;
+    const upgradeUrl = `https://console.firebase.google.com/project/${resolvedFirebaseConfig.projectId}/firestore/databases/${resolvedFirebaseConfig.firestoreDatabaseId}/data?openUpgradeDialog=true`;
 
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">

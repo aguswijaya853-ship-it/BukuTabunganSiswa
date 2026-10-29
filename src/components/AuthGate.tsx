@@ -1,28 +1,124 @@
-import React, { useState } from 'react';
-import { signInWithPopup } from 'firebase/auth';
-import { ArrowRight, BookOpen, FileSpreadsheet, ShieldCheck, Wallet } from 'lucide-react';
-import { auth, googleProvider } from '../firebase';
+import React, { useEffect, useState } from 'react';
+import {
+  AlertCircle,
+  ArrowRight,
+  BookOpen,
+  Check,
+  Copy,
+  ExternalLink,
+  FileSpreadsheet,
+  ShieldCheck,
+  Wallet,
+} from 'lucide-react';
+import {
+  checkGoogleRedirectResult,
+  isFirebaseConfigured,
+  isRunningInIframe,
+  parseFirebaseAuthError,
+  resolvedFirebaseConfig,
+  signInWithGooglePopup,
+  signInWithGoogleRedirect,
+  type ParsedAuthError,
+} from '../firebase';
 import ledgerDeskImage from '../assets/images/school_ledger_desk_1793279217090.jpg';
 
 export const AuthGate: React.FC = () => {
   const [signingIn, setSigningIn] = useState(false);
-  const [authError, setAuthError] = useState<string | null>(null);
+  const [redirecting, setRedirecting] = useState(false);
+  const [authError, setAuthError] = useState<ParsedAuthError | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
   const [imgFailed, setImgFailed] = useState(false);
 
+  const inIframe = isRunningInIframe();
+
+  useEffect(() => {
+    let active = true;
+    checkGoogleRedirectResult()
+      .catch((err) => {
+        if (!active) return;
+        const parsed = parseFirebaseAuthError(err);
+        if (!parsed.isIgnoredCancel) {
+          setAuthError(parsed);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const handleGoogleLogin = async () => {
+    if (!isFirebaseConfigured) {
+      setAuthError({
+        code: 'auth/missing-config',
+        isIgnoredCancel: false,
+        isUnauthorizedDomain: false,
+        isPopupBlocked: false,
+        isInvalidConfig: true,
+        message:
+          'Variabel konfigurasi Firebase belum ditemukan pada deployment Vercel ini.',
+        hostname: typeof window !== 'undefined' ? window.location.hostname : '',
+      });
+      return;
+    }
+
     setSigningIn(true);
     setAuthError(null);
     try {
-      await signInWithPopup(auth, googleProvider);
+      await signInWithGooglePopup();
     } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes('auth/popup-closed-by-user')) {
-        setAuthError('Gagal masuk dengan akun Google. Silakan coba kembali.');
+      const parsed = parseFirebaseAuthError(err);
+      if (parsed.isPopupBlocked && !inIframe) {
+        try {
+          setRedirecting(true);
+          await signInWithGoogleRedirect();
+          return;
+        } catch (redirErr) {
+          setRedirecting(false);
+          const parsedRedir = parseFirebaseAuthError(redirErr);
+          if (!parsedRedir.isIgnoredCancel) {
+            setAuthError(parsedRedir);
+          }
+        }
+      } else if (!parsed.isIgnoredCancel) {
+        setAuthError(parsed);
       }
     } finally {
       setSigningIn(false);
     }
   };
+
+  const handleGoogleRedirectLogin = async () => {
+    if (!isFirebaseConfigured) {
+      await handleGoogleLogin();
+      return;
+    }
+    setRedirecting(true);
+    setAuthError(null);
+    try {
+      await signInWithGoogleRedirect();
+    } catch (err) {
+      setRedirecting(false);
+      const parsed = parseFirebaseAuthError(err);
+      if (!parsed.isIgnoredCancel) {
+        setAuthError(parsed);
+      }
+    }
+  };
+
+  const handleCopyHostname = async () => {
+    if (!authError?.hostname || !navigator.clipboard) return;
+    try {
+      await navigator.clipboard.writeText(authError.hostname);
+      setCopiedDomain(true);
+      window.setTimeout(() => setCopiedDomain(false), 2500);
+    } catch {
+      // Ignore clipboard permission denial
+    }
+  };
+
+  const firebaseAuthSettingsUrl = resolvedFirebaseConfig.projectId
+    ? `https://console.firebase.google.com/project/${resolvedFirebaseConfig.projectId}/authentication/settings`
+    : 'https://console.firebase.google.com/';
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
@@ -67,10 +163,10 @@ export const AuthGate: React.FC = () => {
             <button
               type="button"
               onClick={handleGoogleLogin}
-              disabled={signingIn}
+              disabled={signingIn || redirecting}
               className="px-4 py-2 text-sm font-medium text-white bg-emerald-700 rounded-lg hover:bg-emerald-800 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
-              {signingIn ? 'Memproses...' : 'Masuk Google'}
+              {signingIn || redirecting ? 'Memproses...' : 'Masuk Google'}
             </button>
           </div>
         </div>
@@ -97,25 +193,136 @@ export const AuthGate: React.FC = () => {
             </div>
 
             <div className="space-y-4 pt-2">
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
-                  disabled={signingIn}
+                  disabled={signingIn || redirecting}
                   className="inline-flex items-center gap-2.5 px-6 py-3 text-sm font-semibold text-white bg-emerald-700 rounded-lg hover:bg-emerald-800 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  <span>{signingIn ? 'Menghubungkan Akun...' : 'Masuk dengan Akun Google'}</span>
+                  <span>
+                    {signingIn
+                      ? 'Menghubungkan Popup...'
+                      : redirecting
+                        ? 'Mengalihkan ke Google...'
+                        : 'Masuk dengan Akun Google'}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
-                <span className="text-xs text-slate-500">
-                  Data terisolasi aman per akun bendahara dengan aturan keamanan Firestore.
-                </span>
+
+                {!inIframe && (
+                  <button
+                    type="button"
+                    onClick={handleGoogleRedirectLogin}
+                    disabled={signingIn || redirecting}
+                    className="px-4 py-3 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
+                  >
+                    Masuk via Redirect
+                  </button>
+                )}
               </div>
 
-              {authError && (
-                <p className="text-sm text-red-600 font-medium" role="alert">
-                  {authError}
-                </p>
+              <p className="text-xs text-slate-500">
+                Data terisolasi aman per akun bendahara dan tersinkronisasi lintas domain (AI Studio &amp; Vercel).
+              </p>
+
+              {/* Guided Resolution Card for Vercel Unauthorized Domain */}
+              {authError?.isUnauthorizedDomain && (
+                <div
+                  role="alert"
+                  className="bg-amber-50/80 border border-amber-200 rounded-xl p-4 space-y-3 text-xs text-slate-800"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold text-slate-900">
+                        Domain Vercel Perlu Diizinkan di Firebase Authentication
+                      </p>
+                      <p className="text-slate-700 leading-relaxed">
+                        Demi keamanan OAuth Google, Firebase menolak login dari domain baru sebelum
+                        didaftarkan pada proyek{' '}
+                        <span className="font-mono-num font-semibold">
+                          {resolvedFirebaseConfig.projectId}
+                        </span>
+                        . Lakukan 1 kali langkah berikut (tanpa perlu deploy ulang Vercel):
+                      </p>
+                    </div>
+                  </div>
+
+                  <ol className="list-decimal list-inside space-y-1.5 text-slate-700 pl-1">
+                    <li>
+                      Salin domain aplikasi Anda saat ini:{' '}
+                      <span className="font-mono-num font-semibold text-slate-900">
+                        {authError.hostname}
+                      </span>
+                    </li>
+                    <li>
+                      Buka menu <strong>Authentication &rarr; Settings &rarr; Authorized domains</strong>{' '}
+                      di Firebase Console, klik <strong>Add domain</strong>, lalu tempel domain tersebut.
+                    </li>
+                    <li>
+                      Setelah disimpan, langsung klik kembali tombol <strong>Masuk dengan Akun Google</strong> di atas.
+                    </li>
+                  </ol>
+
+                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyHostname}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 cursor-pointer whitespace-nowrap shrink-0"
+                    >
+                      {copiedDomain ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-700" />
+                          <span>Domain Tersalin</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5" />
+                          <span>Salin {authError.hostname}</span>
+                        </>
+                      )}
+                    </button>
+
+                    <a
+                      href={firebaseAuthSettingsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 whitespace-nowrap shrink-0"
+                    >
+                      <span>Buka Authorized Domains Firebase</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {/* Guided Resolution Card for Missing Vercel Env Config */}
+              {authError && !authError.isUnauthorizedDomain && (
+                <div
+                  role="alert"
+                  className="bg-red-50/80 border border-red-200 rounded-xl p-4 space-y-2 text-xs text-red-900"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-semibold">{authError.message}</p>
+                      {authError.isInvalidConfig && (
+                        <p className="text-red-800 leading-relaxed">
+                          Pastikan berkas <span className="font-mono-num">firebase-applet-config.json</span>{' '}
+                          tersedia di repositori GitHub Anda, atau tambahkan variabel{' '}
+                          <span className="font-mono-num">VITE_FIREBASE_API_KEY</span>,{' '}
+                          <span className="font-mono-num">VITE_FIREBASE_AUTH_DOMAIN</span>,{' '}
+                          <span className="font-mono-num">VITE_FIREBASE_PROJECT_ID</span>,{' '}
+                          <span className="font-mono-num">VITE_FIREBASE_APP_ID</span>, dan{' '}
+                          <span className="font-mono-num">VITE_FIREBASE_FIRESTORE_DATABASE_ID</span> pada
+                          menu <strong>Vercel Project Settings &rarr; Environment Variables</strong> lalu
+                          lakukan Redeploy.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>

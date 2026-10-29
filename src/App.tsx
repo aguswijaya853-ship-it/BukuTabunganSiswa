@@ -27,7 +27,7 @@ import { SchoolProfileTab } from './components/SchoolProfileTab';
 import { StudentsTab } from './components/StudentsTab';
 import { TransactionNotesTab } from './components/TransactionNotesTab';
 import { TransactionsTab } from './components/TransactionsTab';
-import { auth } from './firebase';
+import { auth, isFirebaseConfigured } from './firebase';
 import {
   seedSampleSchoolData,
   subscribeJournalNotes,
@@ -98,17 +98,31 @@ function SakuSiswaWorkspace() {
   );
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    if (!isFirebaseConfigured || !auth) {
       setAuthReady(true);
-      if (!currentUser) {
-        setSchool(null);
-        setStudents([]);
-        setTransactions([]);
-        setJournalNotes([]);
+      setDataLoading(false);
+      return;
+    }
+
+    const unsub = onAuthStateChanged(
+      auth,
+      (currentUser) => {
+        setUser(currentUser);
+        setAuthReady(true);
+        if (!currentUser) {
+          setSchool(null);
+          setStudents([]);
+          setTransactions([]);
+          setJournalNotes([]);
+          setDataLoading(false);
+        }
+      },
+      (err) => {
+        console.error('Auth state error:', err);
+        setAuthReady(true);
         setDataLoading(false);
       }
-    });
+    );
     return unsub;
   }, []);
 
