@@ -1,0 +1,379 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'aguswijaya853@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Validation Blueprint: SchoolProfile
+    function isValidSchoolProfile(data) {
+      return data.keys().hasAll([
+          'ownerId', 'schoolName', 'schoolAddress', 'treasurerName',
+          'principalName', 'academicYear', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'schoolName', 'schoolAddress', 'treasurerName',
+          'principalName', 'academicYear', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.schoolName is string && data.schoolName.size() >= 2 && data.schoolName.size() <= 120 &&
+        data.schoolAddress is string && data.schoolAddress.size() <= 250 &&
+        data.treasurerName is string && data.treasurerName.size() >= 2 && data.treasurerName.size() <= 100 &&
+        data.principalName is string && data.principalName.size() <= 100 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.academicYear.matches('^[0-9/\\-\\sA-Za-z]+$') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: Student
+    function isValidStudent(data) {
+      return data.keys().hasAll([
+          'ownerId', 'nis', 'accountNumber', 'fullName', 'className', 'gender',
+          'guardianName', 'guardianPhone', 'balance', 'totalDeposit',
+          'totalWithdrawal', 'transactionCount', 'status', 'notes',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'nis', 'accountNumber', 'fullName', 'className', 'gender',
+          'guardianName', 'guardianPhone', 'balance', 'totalDeposit',
+          'totalWithdrawal', 'transactionCount', 'status', 'notes',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.nis is string && data.nis.size() >= 2 && data.nis.size() <= 30 &&
+        data.nis.matches('^[a-zA-Z0-9.\\-/]+$') &&
+        data.accountNumber is string && data.accountNumber.size() >= 4 && data.accountNumber.size() <= 32 &&
+        data.accountNumber.matches('^[a-zA-Z0-9\\-]+$') &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100 &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 30 &&
+        data.gender is string && data.gender.size() == 1 && (data.gender == 'L' || data.gender == 'P') &&
+        data.guardianName is string && data.guardianName.size() <= 100 &&
+        data.guardianPhone is string && data.guardianPhone.size() <= 25 &&
+        data.balance is int && data.balance >= 0 && data.balance <= 10000000000 &&
+        data.totalDeposit is int && data.totalDeposit >= 0 && data.totalDeposit <= 10000000000 &&
+        data.totalWithdrawal is int && data.totalWithdrawal >= 0 && data.totalWithdrawal <= 10000000000 &&
+        data.balance == data.totalDeposit - data.totalWithdrawal &&
+        data.transactionCount is int && data.transactionCount >= 0 && data.transactionCount <= 1000000 &&
+        data.status is string && data.status.size() >= 6 && data.status.size() <= 8 &&
+        (data.status == 'active' || data.status == 'archived') &&
+        data.notes is string && data.notes.size() <= 300 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: Transaction
+    function isValidTransaction(data) {
+      return data.keys().hasAll([
+          'ownerId', 'studentId', 'studentName', 'studentNis', 'studentClass',
+          'accountNumber', 'transactionCode', 'type', 'category', 'paymentMethod',
+          'amount', 'balanceBefore', 'balanceAfter', 'transactionDate', 'monthKey',
+          'description', 'note', 'isPinnedNote', 'recordedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'studentId', 'studentName', 'studentNis', 'studentClass',
+          'accountNumber', 'transactionCode', 'type', 'category', 'paymentMethod',
+          'amount', 'balanceBefore', 'balanceAfter', 'transactionDate', 'monthKey',
+          'description', 'note', 'isPinnedNote', 'recordedBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 &&
+        data.studentId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 100 &&
+        data.studentNis is string && data.studentNis.size() >= 2 && data.studentNis.size() <= 30 &&
+        data.studentNis.matches('^[a-zA-Z0-9.\\-/]+$') &&
+        data.studentClass is string && data.studentClass.size() >= 1 && data.studentClass.size() <= 30 &&
+        data.accountNumber is string && data.accountNumber.size() >= 4 && data.accountNumber.size() <= 32 &&
+        data.accountNumber.matches('^[a-zA-Z0-9\\-]+$') &&
+        data.transactionCode is string && data.transactionCode.size() >= 6 && data.transactionCode.size() <= 40 &&
+        data.transactionCode.matches('^[a-zA-Z0-9\\-]+$') &&
+        data.type is string && data.type.size() >= 7 && data.type.size() <= 10 &&
+        (data.type == 'deposit' || data.type == 'withdrawal') &&
+        data.category is string && data.category.size() >= 4 && data.category.size() <= 15 &&
+        (
+          data.category == 'regular' || data.category == 'initial' ||
+          data.category == 'study_tour' || data.category == 'uniform' ||
+          data.category == 'book' || data.category == 'graduation' ||
+          data.category == 'emergency' || data.category == 'other'
+        ) &&
+        data.paymentMethod is string && data.paymentMethod.size() >= 4 && data.paymentMethod.size() <= 8 &&
+        (data.paymentMethod == 'cash' || data.paymentMethod == 'transfer') &&
+        data.amount is int && data.amount > 0 && data.amount <= 1000000000 &&
+        data.balanceBefore is int && data.balanceBefore >= 0 && data.balanceBefore <= 10000000000 &&
+        data.balanceAfter is int && data.balanceAfter >= 0 && data.balanceAfter <= 10000000000 &&
+        (
+          (data.type == 'deposit' && data.balanceAfter == data.balanceBefore + data.amount) ||
+          (data.type == 'withdrawal' && data.balanceBefore >= data.amount && data.balanceAfter == data.balanceBefore - data.amount)
+        ) &&
+        data.transactionDate is string && data.transactionDate.size() == 10 &&
+        data.transactionDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.monthKey is string && data.monthKey.size() == 7 &&
+        data.monthKey.matches('^[0-9]{4}-[0-9]{2}$') &&
+        data.transactionDate[0:7] == data.monthKey &&
+        data.description is string && data.description.size() >= 2 && data.description.size() <= 200 &&
+        data.note is string && data.note.size() <= 500 &&
+        data.isPinnedNote is bool &&
+        data.recordedBy is string && data.recordedBy.size() >= 2 && data.recordedBy.size() <= 100 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Validation Blueprint: JournalNote
+    function isValidJournalNote(data) {
+      return data.keys().hasAll([
+          'ownerId', 'noteDate', 'monthKey', 'title', 'content', 'category',
+          'priority', 'status', 'relatedClass', 'authorName', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'ownerId', 'noteDate', 'monthKey', 'title', 'content', 'category',
+          'priority', 'status', 'relatedClass', 'authorName', 'createdAt', 'updatedAt'
+        ]) &&
+        data.ownerId is string && data.ownerId.size() >= 1 && data.ownerId.size() <= 128 &&
+        data.ownerId.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.ownerId == request.auth.uid &&
+        data.noteDate is string && data.noteDate.size() == 10 &&
+        data.noteDate.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.monthKey is string && data.monthKey.size() == 7 &&
+        data.monthKey.matches('^[0-9]{4}-[0-9]{2}$') &&
+        data.noteDate[0:7] == data.monthKey &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 120 &&
+        data.content is string && data.content.size() >= 3 && data.content.size() <= 1000 &&
+        data.category is string && data.category.size() >= 8 && data.category.size() <= 15 &&
+        (
+          data.category == 'reconciliation' || data.category == 'bank_deposit' ||
+          data.category == 'reminder' || data.category == 'correction'
+        ) &&
+        data.priority is string && data.priority.size() >= 4 && data.priority.size() <= 6 &&
+        (data.priority == 'normal' || data.priority == 'high') &&
+        data.status is string && data.status.size() >= 4 && data.status.size() <= 8 &&
+        (data.status == 'open' || data.status == 'resolved') &&
+        data.relatedClass is string && data.relatedClass.size() <= 30 &&
+        data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 100 &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // Collection 1: Admins (Trusted server/console managed, zero client writes)
+    match /admins/{adminId} {
+      allow get: if isVerifiedUser() && isValidId(adminId) && request.auth.uid == adminId;
+      allow list: if false;
+      allow create, update, delete: if false;
+    }
+
+    // Collection 2: School Profiles (/schools/{ownerId})
+    match /schools/{ownerId} {
+      allow get: if isSignedIn() && isValidId(ownerId) && (request.auth.uid == ownerId || isAdmin());
+      allow list: if false;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(ownerId) &&
+        ownerId == request.auth.uid &&
+        isValidSchoolProfile(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(ownerId) &&
+        isValidSchoolProfile(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'schoolName', 'schoolAddress', 'treasurerName',
+            'principalName', 'academicYear', 'updatedAt'
+          ])
+        );
+
+      allow delete: if false;
+    }
+
+    // Collection 3: Students (/students/{studentId})
+    match /students/{studentId} {
+      allow get: if isSignedIn() && isValidId(studentId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(studentId) &&
+        isValidStudent(incoming()) &&
+        incoming().balance == 0 &&
+        incoming().totalDeposit == 0 &&
+        incoming().totalWithdrawal == 0 &&
+        incoming().transactionCount == 0 &&
+        incoming().status == 'active' &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(studentId) &&
+        isValidStudent(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().accountNumber == existing().accountNumber &&
+        incoming().updatedAt == request.time &&
+        (existing().status != 'archived' || isAdmin()) && (
+          isAdmin() ||
+          // Action 1: Update Student Biodata
+          (
+            incoming().balance == existing().balance &&
+            incoming().totalDeposit == existing().totalDeposit &&
+            incoming().totalWithdrawal == existing().totalWithdrawal &&
+            incoming().transactionCount == existing().transactionCount &&
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'nis', 'fullName', 'className', 'gender',
+              'guardianName', 'guardianPhone', 'notes', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Synchronized Balance Mutation
+          (
+            existing().status == 'active' &&
+            incoming().status == 'active' &&
+            incoming().transactionCount == existing().transactionCount + 1 &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'balance', 'totalDeposit', 'totalWithdrawal', 'transactionCount', 'updatedAt'
+            ])
+          ) ||
+          // Action 3: Archive Student Account (Terminal State Transition, requires 0 balance)
+          (
+            existing().status == 'active' &&
+            incoming().status == 'archived' &&
+            existing().balance == 0 &&
+            incoming().balance == 0 &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['status', 'notes', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isVerifiedUser() &&
+        isValidId(studentId) &&
+        existing().ownerId == request.auth.uid &&
+        existing().balance == 0 &&
+        existing().transactionCount == 0;
+    }
+
+    // Collection 4: Transactions (/transactions/{transactionId})
+    match /transactions/{transactionId} {
+      allow get: if isSignedIn() && isValidId(transactionId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(transactionId) &&
+        isValidTransaction(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time &&
+        exists(/databases/$(database)/documents/students/$(incoming().studentId)) &&
+        get(/databases/$(database)/documents/students/$(incoming().studentId)).data.ownerId == request.auth.uid &&
+        get(/databases/$(database)/documents/students/$(incoming().studentId)).data.status == 'active' &&
+        get(/databases/$(database)/documents/students/$(incoming().studentId)).data.balance == incoming().balanceBefore &&
+        getAfter(/databases/$(database)/documents/students/$(incoming().studentId)).data.balance == incoming().balanceAfter &&
+        getAfter(/databases/$(database)/documents/students/$(incoming().studentId)).data.transactionCount ==
+          get(/databases/$(database)/documents/students/$(incoming().studentId)).data.transactionCount + 1;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(transactionId) &&
+        isValidTransaction(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().studentId == existing().studentId &&
+        incoming().amount == existing().amount &&
+        incoming().type == existing().type &&
+        incoming().balanceBefore == existing().balanceBefore &&
+        incoming().balanceAfter == existing().balanceAfter &&
+        incoming().transactionCode == existing().transactionCode &&
+        incoming().transactionDate == existing().transactionDate &&
+        incoming().monthKey == existing().monthKey &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          // Action: Update Audit Note / Pin Flag Only
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'note', 'isPinnedNote', 'description', 'updatedAt'
+          ])
+        );
+
+      allow delete: if false;
+    }
+
+    // Collection 5: Journal Notes (/journal_notes/{noteId})
+    match /journal_notes/{noteId} {
+      allow get: if isSignedIn() && isValidId(noteId) && (existing().ownerId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if isVerifiedUser() &&
+        isValidId(noteId) &&
+        isValidJournalNote(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser() &&
+        isValidId(noteId) &&
+        isValidJournalNote(incoming()) &&
+        existing().ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        (existing().status != 'resolved' || isAdmin()) && (
+          isAdmin() ||
+          // Action 1: Edit Open Note Details
+          (
+            existing().status == 'open' &&
+            incoming().status == 'open' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'noteDate', 'monthKey', 'title', 'content',
+              'category', 'priority', 'relatedClass', 'updatedAt'
+            ])
+          ) ||
+          // Action 2: Resolve Note (Terminal State Transition)
+          (
+            existing().status == 'open' &&
+            incoming().status == 'resolved' &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'status', 'content', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerifiedUser() &&
+        isValidId(noteId) &&
+        existing().ownerId == request.auth.uid;
+    }
+  }
+}

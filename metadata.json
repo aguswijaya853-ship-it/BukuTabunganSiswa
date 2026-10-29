@@ -1,0 +1,6 @@
+{
+  "name": "SakuSiswa",
+  "description": "Aplikasi manajemen tabungan siswa real-time dengan buku mutasi, catatan transaksi, laporan bulanan otomatis, serta ekspor PDF dan Excel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

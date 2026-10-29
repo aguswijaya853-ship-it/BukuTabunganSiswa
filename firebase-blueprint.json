@@ -1,0 +1,489 @@
+{
+  "entities": {
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Trusted administrator marker document managed exclusively via privileged console.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 120,
+          "minLength": 5,
+          "description": "Verified administrator email address."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of role creation."
+        }
+      },
+      "required": ["email", "createdAt"]
+    },
+    "SchoolProfile": {
+      "title": "SchoolProfile",
+      "description": "Institutional identity and signatory configuration for official PDF and Excel savings reports.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the treasurer owning this workspace."
+        },
+        "schoolName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120,
+          "description": "Official school name displayed on report letterheads."
+        },
+        "schoolAddress": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 250,
+          "description": "Complete school address for official report headers."
+        },
+        "treasurerName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Full name of the savings treasurer."
+        },
+        "principalName": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 100,
+          "description": "Full name of the school principal for report sign-off."
+        },
+        "academicYear": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 20,
+          "pattern": "^[0-9/\\-\\sA-Za-z]+$",
+          "description": "Active academic year label (e.g. 2026/2027)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last update timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "schoolName",
+        "schoolAddress",
+        "treasurerName",
+        "principalName",
+        "academicYear",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student savings account record with real-time synchronized balance and guardian details.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the owning treasurer."
+        },
+        "nis": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 30,
+          "pattern": "^[a-zA-Z0-9.\\-/]+$",
+          "description": "Student identification number (NIS/NISN)."
+        },
+        "accountNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9\\-]+$",
+          "description": "Unique student passbook account number."
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Student full legal name."
+        },
+        "className": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "description": "Class or grade designation (e.g. Kelas 5A)."
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["L", "P"],
+          "maxLength": 1,
+          "minLength": 1,
+          "description": "Student gender code (L or P)."
+        },
+        "guardianName": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 100,
+          "description": "Parent or guardian name (PII isolated to owner)."
+        },
+        "guardianPhone": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 25,
+          "description": "Parent or guardian phone number (PII isolated to owner)."
+        },
+        "balance": {
+          "type": "integer",
+          "description": "Current savings balance in IDR (>= 0)."
+        },
+        "totalDeposit": {
+          "type": "integer",
+          "description": "Cumulative deposits in IDR (>= 0)."
+        },
+        "totalWithdrawal": {
+          "type": "integer",
+          "description": "Cumulative withdrawals in IDR (>= 0)."
+        },
+        "transactionCount": {
+          "type": "integer",
+          "description": "Total number of ledger transactions recorded."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "archived"],
+          "minLength": 6,
+          "maxLength": 8,
+          "description": "Account lifecycle status; archived is a terminal state."
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 300,
+          "description": "Optional administrative remarks for this student."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification server timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "nis",
+        "accountNumber",
+        "fullName",
+        "className",
+        "gender",
+        "guardianName",
+        "guardianPhone",
+        "balance",
+        "totalDeposit",
+        "totalWithdrawal",
+        "transactionCount",
+        "status",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Immutable financial mutation entry in a student savings ledger with editable audit note.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the owning treasurer."
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Document ID of the associated Student."
+        },
+        "studentName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Snapshot of student name at transaction time."
+        },
+        "studentNis": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 30,
+          "pattern": "^[a-zA-Z0-9.\\-/]+$",
+          "description": "Snapshot of student NIS at transaction time."
+        },
+        "studentClass": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 30,
+          "description": "Snapshot of student class at transaction time."
+        },
+        "accountNumber": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[a-zA-Z0-9\\-]+$",
+          "description": "Snapshot of student passbook account number."
+        },
+        "transactionCode": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 40,
+          "pattern": "^[a-zA-Z0-9\\-]+$",
+          "description": "Human-readable receipt reference code."
+        },
+        "type": {
+          "type": "string",
+          "enum": ["deposit", "withdrawal"],
+          "minLength": 7,
+          "maxLength": 10,
+          "description": "Transaction direction: deposit (setoran) or withdrawal (penarikan)."
+        },
+        "category": {
+          "type": "string",
+          "enum": [
+            "regular",
+            "initial",
+            "study_tour",
+            "uniform",
+            "book",
+            "graduation",
+            "emergency",
+            "other"
+          ],
+          "minLength": 4,
+          "maxLength": 15,
+          "description": "Purpose classification for monthly reporting."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "enum": ["cash", "transfer"],
+          "minLength": 4,
+          "maxLength": 8,
+          "description": "Settlement channel: cash (tunai) or transfer."
+        },
+        "amount": {
+          "type": "integer",
+          "description": "Positive transaction nominal in IDR (> 0)."
+        },
+        "balanceBefore": {
+          "type": "integer",
+          "description": "Student balance immediately prior to this mutation."
+        },
+        "balanceAfter": {
+          "type": "integer",
+          "description": "Student balance immediately after this mutation."
+        },
+        "transactionDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Accounting effective date in YYYY-MM-DD format."
+        },
+        "monthKey": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Accounting month key in YYYY-MM format for automatic monthly reports."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200,
+          "description": "Primary passbook mutation description."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 500,
+          "description": "Detailed transaction note / audit memo."
+        },
+        "isPinnedNote": {
+          "type": "boolean",
+          "description": "Flag marking transaction note for treasurer follow-up."
+        },
+        "recordedBy": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Name of treasurer recording the transaction."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last note update server timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "studentId",
+        "studentName",
+        "studentNis",
+        "studentClass",
+        "accountNumber",
+        "transactionCode",
+        "type",
+        "category",
+        "paymentMethod",
+        "amount",
+        "balanceBefore",
+        "balanceAfter",
+        "transactionDate",
+        "monthKey",
+        "description",
+        "note",
+        "isPinnedNote",
+        "recordedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "JournalNote": {
+      "title": "JournalNote",
+      "description": "Treasurer operational cashbook note, reconciliation log, or follow-up memo.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the owning treasurer."
+        },
+        "noteDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "description": "Effective date of the operational note (YYYY-MM-DD)."
+        },
+        "monthKey": {
+          "type": "string",
+          "minLength": 7,
+          "maxLength": 7,
+          "pattern": "^[0-9]{4}-[0-9]{2}$",
+          "description": "Month key in YYYY-MM format."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120,
+          "description": "Concise subject heading of the note."
+        },
+        "content": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 1000,
+          "description": "Detailed reconciliation or transaction memo body."
+        },
+        "category": {
+          "type": "string",
+          "enum": ["reconciliation", "bank_deposit", "reminder", "correction"],
+          "minLength": 8,
+          "maxLength": 15,
+          "description": "Classification of the operational note."
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["normal", "high"],
+          "minLength": 4,
+          "maxLength": 6,
+          "description": "Urgency level."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "resolved"],
+          "minLength": 4,
+          "maxLength": 8,
+          "description": "Resolution status; resolved is a terminal state."
+        },
+        "relatedClass": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 30,
+          "description": "Optional class reference (e.g. Kelas 6A)."
+        },
+        "authorName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Display name of the treasurer who authored the note."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Immutable creation server timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modification server timestamp."
+        }
+      },
+      "required": [
+        "ownerId",
+        "noteDate",
+        "monthKey",
+        "title",
+        "content",
+        "category",
+        "priority",
+        "status",
+        "relatedClass",
+        "authorName",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "System administrator registry (read-only for owner, client writes denied)."
+    },
+    "/schools/{ownerId}": {
+      "schema": { "$ref": "#/entities/SchoolProfile" },
+      "description": "Per-treasurer school profile and PDF/Excel signatory settings."
+    },
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Student savings master records isolated by ownerId."
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Immutable student savings mutations synchronized atomically with student balances."
+    },
+    "/journal_notes/{noteId}": {
+      "schema": { "$ref": "#/entities/JournalNote" },
+      "description": "Treasurer operational transaction notes and cash reconciliation logs."
+    }
+  }
+}
